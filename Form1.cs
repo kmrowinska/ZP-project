@@ -2,18 +2,25 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.ProgressBar;
 
-namespace PROJEKT_ZAPIERDALANIE
+namespace Projekt_ZP
 {
     public partial class Form1 : Form
     {
+        private List<int> P, D;
+        private Random random;
+        private CancellationTokenSource cancellationTokenSource;
+
         public Form1()
         {
             InitializeComponent();
@@ -22,7 +29,6 @@ namespace PROJEKT_ZAPIERDALANIE
             random = new Random();
         }
 
-        List<int> P, D;
         
         //zapis do pliku
         private void button2_Click(object sender, EventArgs e)
@@ -33,6 +39,18 @@ namespace PROJEKT_ZAPIERDALANIE
                 Title = "Zapisz instancje do pliku .txt"
             };
 
+            if (sFD.ShowDialog() == DialogResult.OK)
+            {
+                try
+                {
+                    File.WriteAllText(sFD.FileName, string.Join(" ", D));
+                    MessageBox.Show("Dane zapisano pomyślnie!", "Sukces", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Błąd podczas zapisu: {ex.Message}", "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
 
         }
 
@@ -52,12 +70,11 @@ namespace PROJEKT_ZAPIERDALANIE
                     string fileContent = File.ReadAllText(openFileDialog.FileName);
                     richTextBox2.Text = fileContent;
 
-                    // Parsowanie multizbioru z pliku
                     D = fileContent.Split(new[] { ' ', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
                                     .Select(int.Parse)
                                     .ToList();
 
-                    // Blokowanie opcji generowania nowego multizbioru
+                    
                     numericUpDown1.Enabled = false;
                     numericUpDown2.Enabled = false;
                     numericUpDown3.Enabled = false; 
@@ -93,24 +110,21 @@ namespace PROJEKT_ZAPIERDALANIE
             Generate_D(P, D);
             D.Sort();
 
-            // Wyświetlanie oryginalnych danych w richTextBox1 i richTextBox2
             richTextBox1.Text = string.Join(" ", P);
             richTextBox2.Text = string.Join(" ", D);
 
-            // Sprawdzenie warunków modyfikacji i ewentualne wprowadzenie błędów
+
             if (insertion > 0 || deletion > 0)
             {
-                List<int> modifiedD = new List<int>(D); // Tworzymy kopię D, aby nie zmieniać oryginału
+                List<int> modifiedD = new List<int>(D); 
                 Errors_in_D(modifiedD, insertion, deletion, len, count);
-                richTextBox3.Text = string.Join(" ", modifiedD); // Wyświetlenie zmodyfikowanego multizbioru
+                richTextBox3.Text = string.Join(" ", modifiedD); 
             }
             else
             {
-                richTextBox3.Text = string.Join(" ", D); // Jeśli brak modyfikacji, wyświetl oryginalne D
+                richTextBox3.Text = string.Join(" ", D); 
             }
         }
-
-
 
 
         private List<int> Generate_P(int len, int count)
@@ -130,8 +144,6 @@ namespace PROJEKT_ZAPIERDALANIE
 
         private void Generate_D(List<int> P, List<int> D)
          {
-            // D.Clear();
-            // richTextBox2.Clear();
 
              HashSet<int> multiset  = new HashSet<int>();    
 
@@ -150,7 +162,7 @@ namespace PROJEKT_ZAPIERDALANIE
 
         private void numericUpDown3_ValueChanged(object sender, EventArgs e)
         {
-            if (D != null && D.Any()) // Sprawdzanie, czy D jest wczytane i zawiera elementy
+            if (D != null && D.Any()) 
             {
                 int insertion = (int)numericUpDown3.Value;
                 int deletion = (int)numericUpDown2.Value;
@@ -167,13 +179,9 @@ namespace PROJEKT_ZAPIERDALANIE
 
         private void numericUpDown2_ValueChanged(object sender, EventArgs e)
         {
-            numericUpDown3_ValueChanged(sender, e); // Wspólna logika dla obu kontrolek
+            numericUpDown3_ValueChanged(sender, e); 
         }
 
-
-
-
-        Random random;
 
         //reset danych
         private void button4_Click(object sender, EventArgs e)
@@ -226,6 +234,123 @@ namespace PROJEKT_ZAPIERDALANIE
             }
 
             Console.WriteLine("D po zmianach: " + string.Join(" ", D));
+        }
+
+        private void button9_Click(object sender, EventArgs e)
+        {
+            cancellationTokenSource?.Cancel();
+        }
+
+        private void button5_Click(object sender, EventArgs e)
+        {
+            Run_GA();
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            
+            if (D == null || D.Count == 0)
+            {
+                MessageBox.Show("Najpierw wczytaj lub wygeneruj multizbiór D.", "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            
+            if (listView1.Items.Count == 0)
+            {
+                MessageBox.Show("Najpierw uruchom algorytm genetyczny, aby uzyskać rozwiązanie.", "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            
+            string zawartoscPliku = $"P: {(P != null && P.Count > 0 ? string.Join(" ", P) : "BRAK DANYCH")}\n";
+            zawartoscPliku += $"D (oryginalne): {string.Join(" ", D)}\n";
+            zawartoscPliku += $"D (użyte w algorytmie): {richTextBox3.Text}\n"; 
+            zawartoscPliku += $"Rozwiązanie: {listView1.Items[0].Text}";
+
+            
+            SaveFileDialog saveDialog = new SaveFileDialog
+            {
+                Filter = "Pliki tekstowe (*.txt)|*.txt",
+                Title = "Zapisz wyniki do pliku"
+            };
+
+            if (saveDialog.ShowDialog() == DialogResult.OK)
+            {
+                try
+                {
+                    File.WriteAllText(saveDialog.FileName, zawartoscPliku);
+                    MessageBox.Show("Plik został zapisany pomyślnie!", "Sukces", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Błąd podczas zapisywania pliku: {ex.Message}", "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        private void button10_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private async void Run_GA()
+        {
+            cancellationTokenSource?.Dispose();
+            cancellationTokenSource = new CancellationTokenSource();
+            var cancellationToken = cancellationTokenSource.Token;
+
+
+            int populationSize = (int)numericUpDown5.Value;
+            double mutationRate = (double)numericUpDown6.Value / 100;
+            double crossoverRate = (double)numericUpDown7.Value / 100;
+            int generations = (int)numericUpDown8.Value;
+            int tournamentSize = (int)numericUpDown9.Value;
+            int maxGenerations = (int)numericUpDown10.Value;
+
+            listView4.Items.Clear();
+            listView1.Items.Clear();
+
+            
+            listView4.View = View.Details;
+            listView4.Columns.Clear();
+            listView4.Columns.Add("Generacja ", 150);
+            listView4.Columns.Add("Rozwiązanie", 250);
+
+            listView1.View = View.Details;
+            listView1.Columns.Clear();
+            listView1.Columns.Add("Najlepsze globalnie", 300);
+
+            try
+            {
+                var progress = new Progress<(int Progress, List<int> CurrentBest, List<int> OverallBest)>(report =>
+                {
+                    toolStripProgressBar1.Value = report.Progress; 
+
+                
+                    var generationItem = new ListViewItem($"Generacja {listView4.Items.Count + 1}");
+                    generationItem.SubItems.Add(string.Join(" ", report.CurrentBest.OrderBy(x => x)));
+                    listView4.Items.Add(generationItem);
+                    listView1.Items.Clear();
+                    var overallItem = new ListViewItem(string.Join(" ", report.OverallBest.OrderBy(x => x)));
+                    listView1.Items.Add(overallItem);
+                    listView4.EnsureVisible(listView4.Items.Count - 1);
+                });
+
+                await Task.Run(async () =>
+                {
+                    var ga = new Algorytm(D, populationSize, generations, crossoverRate, mutationRate, tournamentSize, maxGenerations);
+                    await ga.RunGeneticAlgorithmAsync(progress, cancellationToken);
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Błąd: {ex.Message}");
+            }
+            finally
+            {
+                toolStripProgressBar1.Value = 100; 
+            }
         }
     }
 }
